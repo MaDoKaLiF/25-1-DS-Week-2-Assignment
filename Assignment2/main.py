@@ -12,7 +12,6 @@ from utils import log_args
 def record_folder(cur_iter):
     return f"{task}/{experiment_name}/{experiment_name}_{cur_iter}"
 
-
 def parse_args():
     # Parse command line arguments
     parser = argparse.ArgumentParser()
@@ -32,7 +31,7 @@ def parse_args():
     parser.add_argument('--rationalize', type=bool, default=True, help="Whether to use rationalization")
 
     parser.add_argument("--start_iter", type=int, default=1, help="Starting iteration")
-    parser.add_argument("--n_iters", type=int, default=46, help="Upper limit on outer loop iterations")
+    parser.add_argument("--n_iters", type=int, default=1, help="Upper limit on outer loop iterations")
 
     parser.add_argument("--copy_n", type=int, default=0, help="Number of files to copy each iteration")
 
@@ -54,91 +53,35 @@ def gen_train():
         train_cmd += " --rationalize"
         train_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
 
-    if args.method == "no_beta_cap":
-        train_cmd = f"python3 device_inference.py --config={prev_config} --split=train --seed={args.seed}"
-        train_cmd += f" --task={task}"
-        train_cmd += " --rationalize"
-        train_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
-
-    elif args.method in {"nobeta_k_sample", "k_sample"}:
-        train_cmd = f"python3 device_inference_ksample.py --config={prev_config} --split=train --seed={args.seed}"
-        train_cmd += f" --task={task}"
-        train_cmd += " --rationalize"
-        train_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
-
-    elif args.method == "adastar":
-        train_cmd = f"python3 device_inference_adastar.py --config={prev_config} --split=train --seed={args.seed}"
-        train_cmd += f" --task={task}"
-        train_cmd += " --rationalize"
-        train_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
-        train_cmd += f" --cur_total_steps={get_n_steps()}"
-
-    elif args.method == "adastar_new":
-        train_cmd = f"python3 device_inference_adastar_new.py --config={prev_config} --split=train --seed={args.seed}"
-        train_cmd += f" --task={task}"
-        train_cmd += " --rationalize"
-        train_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
-        train_cmd += f" --cur_total_steps={get_n_steps()}"
-
-    elif args.method == "k_sample_adastar_new":
-        train_cmd = f"python3 device_inference_ksample_adastar_new.py --config={prev_config} --split=train --seed={args.seed}"
-        train_cmd += f" --task={task}"
-        train_cmd += " --rationalize"
-        train_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
-        train_cmd += f" --cur_total_steps={get_n_steps()}"
-
-    elif args.method == "irpo":
-        train_cmd = f"python3 answer_generation_irpo.py --config={prev_config} --seed={args.seed} --task={task} --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
-
     print(f"Generating training set {cur_iter} using model {cur_iter - 1}: {train_cmd}")
     if not args.dry_run and (cur_iter >= args.start_iter):
-        if args.method in {"vanilla", "k_sample", "adastar", "adastar_new", "k_sample_adastar_new"} and (cur_iter == 1) and os.path.exists(
+        if args.method =="vanilla" and (cur_iter == 1) and os.path.exists(
                 record_folder(0) + f"/correct_data.txt"):
-            print("First file cached")
-        elif args.method == "irpo" and (cur_iter == 1) and os.path.exists(record_folder(0) + f"/irpo_data.jsonl"):
             print("First file cached")
         else:
             os.system(train_cmd)
 
 
-def gen_records():
-    gen_cmd = f'python3 create_finetune_tfrecords.py {record_folder(cur_iter - 1)} {record_folder(cur_iter - 1)}  --model_name={args.model_name} --seed={args.seed}'
-    gen_cmd += f' --max-length={args.max_length}'
-    gen_cmd += f' --idx_save={record_folder(cur_iter - 1)}'
-    gen_cmd += f' --split=train'
-    gen_cmd += f' --exp_iter={cur_iter}'
+# def gen_records():
+#     gen_cmd = f'python3 create_finetune_tfrecords.py {record_folder(cur_iter - 1)} {record_folder(cur_iter - 1)}  --model_name={args.model_name} --seed={args.seed}'
+#     gen_cmd += f' --max-length={args.max_length}'
+#     gen_cmd += f' --idx_save={record_folder(cur_iter - 1)}'
+#     gen_cmd += f' --split=train'
+#     gen_cmd += f' --exp_iter={cur_iter}'
 
-    print(f"Creating records for finetuning {cur_iter}: {gen_cmd}")
-    if not args.dry_run and (cur_iter >= args.start_iter):
-        if args.method in {"vanilla", "no_beta_cap", "adastar", "adastar_new", "k_sample", "k_sample_adastar_new", "nobeta_k_sample"}:
-            os.system(gen_cmd)
-        elif args.method == "irpo":
-            pass
+#     print(f"Creating records for finetuning {cur_iter}: {gen_cmd}")
+#     if not args.dry_run and (cur_iter >= args.start_iter):
+#         if args.method in {"vanilla"}:
+#             os.system(gen_cmd)
 
-    train_set = f"{experiment_name}/{exp_iteration}.index"
+#     train_set = f"{experiment_name}/{exp_iteration}.index"
 
-    if args.method in {"vanilla", "no_beta_cap", "adastar", "adastar_new", "k_sample", "k_sample_adastar_new", "nobeta_k_sample"}:
-        with open(f"data/{train_set}", "w") as new_data_file:
-            new_data_file.write(f"{record_folder(cur_iter - 1)}.pt")
-    if args.method == "irpo":
-        with open(f"data/{train_set}", "w") as new_data_file:
-            new_data_file.write(f"{record_folder(cur_iter - 1)}/irpo_data.jsonl")
-    return
-
-def get_no_beta_steps():
-    log_file = os.path.join(record_folder(cur_iter-1), "step.json")
-    if os.path.exists(log_file):
-        with open(log_file, "r", encoding="utf-8") as f:
-            logs = json.load(f)
-        last_step = logs[-1]["step"]
-        print("Last step:", last_step)
-        
-        return last_step
+#     if args.method in {"vanilla"}:
+#         with open(f"data/{train_set}", "w") as new_data_file:
+#             new_data_file.write(f"{record_folder(cur_iter - 1)}.pt")
+#     return
  
-
 def get_n_steps():
-    if args.method == "irpo":
-        return args.start_steps
     if args.steady_grow:
         return int(args.start_steps + args.add_steps * (cur_iter - 1))
     elif args.exponential_grow:  # Default setup from STaR paper
@@ -193,41 +136,30 @@ def gen_no_beta_config():
     return config_name
 
 
-def train_model():
-    if args.method in {"vanilla", "adastar", "adastar_new", "k_sample", "k_sample_adastar_new"}:
-        model_cmd = f"python device_train.py --config {config_name} --tune-model-path={args.base_model_location} --exp_iter={cur_iter} --seed={args.seed} --log_dir={record_folder(cur_iter - 1)} --data_dir=data/{experiment_name}/{exp_iteration}.index"
-        if len(log_gen) >1:  
-            delete_path = f"{args.base_model_location}/{experiment_name}_{cur_iter - 2}/step_{log_gen[0]}/lm.pt"
-            model_cmd += f" --delete_path={delete_path}"
-        if args.accumulate == True and cur_iter != 1:
-            model_path = f"{args.base_model_location}/{experiment_name}_{cur_iter - 1}/step_{log_gen[-1]}/lm.pt"
-            model_cmd += f" --model_path={model_path}"
-    elif args.method in {"nobeta_k_sample", "no_beta_cap"}:
-        model_cmd = f"python device_train_no_beta_cap.py --config {config_name} --tune-model-path={args.base_model_location} --exp_iter={cur_iter} --seed={args.seed} --log_dir={record_folder(cur_iter - 1)} --data_dir=data/{experiment_name}/{exp_iteration}.index"
-        if len(log_gen) >1:
-            delete_path = f"{args.base_model_location}/{experiment_name}_{cur_iter - 2}/step_{log_gen[0]}/lm.pt"
-            model_cmd += f" --delete_path={delete_path}"
-        if args.accumulate == True and cur_iter != 1:
-            model_path = f"{args.base_model_location}/{experiment_name}_{cur_iter - 1}/step_{log_gen[-1]}/lm.pt"
-            model_cmd += f" --model_path={model_path}"
-
-    elif args.method == "irpo":
-        model_cmd = f"python device_train_irpo.py --config {config_name} --tune-model-path={args.base_model_location} --exp_iter={cur_iter} --seed={args.seed} --log_dir={record_folder(cur_iter - 1)} --data_dir=data/{experiment_name}/{exp_iteration}.index"
-
-    print(f"Train model {cur_iter}: {model_cmd}")
-    if not args.dry_run and (cur_iter >= args.start_iter):
-        os.system(model_cmd)
+# def train_model():
+#     if args.method in {"vanilla"}:
+#         model_cmd = f"python device_train.py --config {config_name} --tune-model-path={args.base_model_location} --exp_iter={cur_iter} --seed={args.seed} --log_dir={record_folder(cur_iter - 1)} --data_dir=data/{experiment_name}/{exp_iteration}.index"
+#         if len(log_gen) >1:  
+#             delete_path = f"{args.base_model_location}/{experiment_name}_{cur_iter - 2}/step_{log_gen[0]}/lm.pt"
+#             model_cmd += f" --delete_path={delete_path}"
+#         if args.accumulate == True and cur_iter != 1:
+#             model_path = f"{args.base_model_location}/{experiment_name}_{cur_iter - 1}/step_{log_gen[-1]}/lm.pt"
+#             model_cmd += f" --model_path={model_path}"
+    
+#     print(f"Train model {cur_iter}: {model_cmd}")
+#     if not args.dry_run and (cur_iter >= args.start_iter):
+#         os.system(model_cmd)
 
 
-def eval_model():
-    eval_cmd = f"python3 device_inference.py --config={config_name} --split=dev --seed={args.seed}"
-    eval_cmd += f" --task={task} "
-    eval_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
-    eval_cmd += f" --flops_dir={record_folder(cur_iter-1)}"
+# def eval_model():
+#     eval_cmd = f"python3 device_inference.py --config={config_name} --split=dev --seed={args.seed}"
+#     eval_cmd += f" --task={task} "
+#     eval_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
+#     eval_cmd += f" --flops_dir={record_folder(cur_iter-1)}"
 
-    print(f"Eval model {cur_iter}: {eval_cmd}")
-    if not args.dry_run and (cur_iter >= args.start_iter) and not args.skip_eval:
-        os.system(eval_cmd)
+#     print(f"Eval model {cur_iter}: {eval_cmd}")
+#     if not args.dry_run and (cur_iter >= args.start_iter) and not args.skip_eval:
+#         os.system(eval_cmd)
 
 
 def copy_files():
@@ -238,7 +170,7 @@ def copy_files():
 
 
 def make_first_config():
-    if args.method != "vanilla" and args.method != "no_beta_cap":
+    if args.method != "vanilla":
         with open(f'configs_method/{args.method}.json', 'r') as method_json_file:
             method_json = json.load(method_json_file)
     else:
@@ -275,65 +207,6 @@ def make_first_config():
     return new_json
 
 
-def find_last_completed_iteration(experiment_name, n_iters):
-    log_file_path = f"{task}/{experiment_name}/eval_log.json"
-
-    if not os.path.exists(log_file_path):
-        return 0, None
-
-    try:
-        with open(log_file_path, 'r') as log_file:
-            logs = json.load(log_file)
-
-            if isinstance(logs, list):
-                # 각 iteration의 train/dev 상태를 추적하는 딕셔너리
-                completed_iters = {}
-
-                # 모든 로그 엔트리 처리
-                for entry in logs:
-                    if not isinstance(entry, dict) or 'iter' not in entry:
-                        continue
-
-                    iter_num = entry['iter']
-                    split = entry.get('split')
-
-                    if iter_num not in completed_iters:
-                        completed_iters[iter_num] = {'train': False, 'dev': False}
-
-                    if split == 'train':
-                        completed_iters[iter_num]['train'] = True
-                    elif split == 'dev':
-                        completed_iters[iter_num]['dev'] = True
-
-                # 완전히 완료된 마지막 iteration 찾기
-                fully_completed_iters = [
-                    iter_num for iter_num, status in completed_iters.items()
-                    if status['train'] and status['dev']
-                ]
-
-                if not fully_completed_iters:
-                    return 0, None
-
-                last_full_iter = max(fully_completed_iters)
-
-                # 다음 iteration이 train만 완료되었는지 확인
-                # next_iter = last_full_iter + 1
-                # if next_iter in completed_iters:
-                #     if completed_iters[next_iter]['train'] and not completed_iters[next_iter]['dev']:
-                #         return last_full_iter, 'eval'
-
-                return last_full_iter, None
-
-            elif isinstance(logs, dict) and 'iter' in logs:
-                iter_num = logs['iter']
-                return iter_num - 1, None
-
-    except json.JSONDecodeError:
-        return 0, None
-
-    return 0, None
-
-
 if __name__ == "__main__":
     args = parse_args()
     print(args)
@@ -348,47 +221,42 @@ if __name__ == "__main__":
     new_json = make_first_config()
     task = args.task
 
-    # 마지막으로 완료된 iteration과 재시작 지점 찾기
-    last_completed_iter, restart_point = find_last_completed_iteration(experiment_name, args.n_iters)
-
-    # 다음 iteration 설정
-    args.start_iter = last_completed_iter + 1
     log_gen =[]
 
     # 첫 iteration이 아닌 경우 처리
-    if last_completed_iter > 0:
-        prev_config = f'configs/{experiment_name}/{experiment_name}_{last_completed_iter}.json'
-        if not os.path.exists(prev_config):
-            print(f"Warning: Could not find config file for last completed iteration: {prev_config}")
-            print("Falling back to base config")
-            prev_config = f"configs/{experiment_name}/base.json"
-        else:
-            print(f"Starting iteration {args.start_iter} using config from iteration {last_completed_iter}")
+    # if last_completed_iter > 0:
+    #     prev_config = f'configs/{experiment_name}/{experiment_name}_{last_completed_iter}.json'
+    #     if not os.path.exists(prev_config):
+    #         print(f"Warning: Could not find config file for last completed iteration: {prev_config}")
+    #         print("Falling back to base config")
+    #         prev_config = f"configs/{experiment_name}/base.json"
+    #     else:
+    #         print(f"Starting iteration {args.start_iter} using config from iteration {last_completed_iter}")
 
-        # flops 로그 파일 삭제
-        flops_log_files = glob.glob(record_folder(last_completed_iter) + f"/flops_log*.json")
-        for file in flops_log_files:
-            os.remove(file)
-        indice_log_files = glob.glob(record_folder(last_completed_iter) + f"/*indices_log.json")
-        for file in indice_log_files:
-            os.remove(file)
-        file_path=record_folder(last_completed_iter) + f"/final_indices_stats.json"
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        file_path=record_folder(last_completed_iter) + f"/train_log.json"
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            # 이전 iteration의 beta 구하기
-        for cur_iter in range(args.start_iter - 2,args.start_iter):
-            exp_iteration = f"{experiment_name}_{cur_iter}"
-            log_gen.append(get_n_steps())
+    #     # flops 로그 파일 삭제
+    #     flops_log_files = glob.glob(record_folder(last_completed_iter) + f"/flops_log*.json")
+    #     for file in flops_log_files:
+    #         os.remove(file)
+    #     indice_log_files = glob.glob(record_folder(last_completed_iter) + f"/*indices_log.json")
+    #     for file in indice_log_files:
+    #         os.remove(file)
+    #     file_path=record_folder(last_completed_iter) + f"/final_indices_stats.json"
+    #     if os.path.exists(file_path):
+    #         os.remove(file_path)
+    #     file_path=record_folder(last_completed_iter) + f"/train_log.json"
+    #     if os.path.exists(file_path):
+    #         os.remove(file_path)
+    #         # 이전 iteration의 beta 구하기
+    #     for cur_iter in range(args.start_iter - 2,args.start_iter):
+    #         exp_iteration = f"{experiment_name}_{cur_iter}"
+    #         log_gen.append(get_n_steps())
 
     os.makedirs(f'data/{experiment_name}', exist_ok=True)
     os.makedirs(f'{task}/{experiment_name}', exist_ok=True)
 
 
     # 메인 학습 루프
-    for cur_iter in range(args.start_iter, args.n_iters + 1):
+    for cur_iter in range(1, args.n_iters + 1):
         exp_iteration = f"{experiment_name}_{cur_iter}"
 
         # #restart_point가 'eval'이고 첫 iteration인 경우, train 과정 건너뛰기
@@ -398,25 +266,20 @@ if __name__ == "__main__":
         # else:
         gen_train()
 
-        start_time = time.time()
-        gen_records()
-        elapsed_record = time.time() - start_time
-        file = f"{task}/{experiment_name}/elapsed_time_log.json"
-        log_args(file, iter=cur_iter, log_point="tfrecord", time=elapsed_record)
+        # start_time = time.time()
+        # gen_records()
+        # elapsed_record = time.time() - start_time
+        # file = f"{task}/{experiment_name}/elapsed_time_log.json"
+        # log_args(file, iter=cur_iter, log_point="tfrecord", time=elapsed_record)
 
-        config_name = gen_config()
-        train_model()
-        if args.method in {"no_beta_cap", "nobeta_k_sample"}:
-            gen_no_beta_config()
-        eval_model()
+        # config_name = gen_config()
+        # train_model()
+        # eval_model()
 
-        prev_config = config_name
-        if args.method in {"no_beta_cap", "nobeta_k_sample"}:
-            log_gen.append(get_no_beta_steps())
-        else:
-            log_gen.append(get_n_steps())
-        if len(log_gen) > 2:
-            log_gen.pop(0)
+        # prev_config = config_name
+        # log_gen.append(get_n_steps())
+        # if len(log_gen) > 2:
+        #     log_gen.pop(0)
 
-        if args.copy_n > 0:
-            copy_files()
+        # if args.copy_n > 0:
+        #     copy_files()

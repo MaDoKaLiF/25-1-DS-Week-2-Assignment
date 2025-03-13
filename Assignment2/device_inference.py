@@ -18,48 +18,12 @@ pp = pprint.PrettyPrinter(indent=2).pprint
 
 
 def write_new_data(args, target_save, pred, data, endoftext):
-    if args.task == "logiqa":
-        t, q, o = data["text"], data["question"], data["options"]
-        new_example = f"{t}\nQ: {q}\nOptions:\n0.{o[0]}\n1.{o[1]}\n2.{o[2]}\n3.{o[3]}\nA: {pred}" + endoftext
-    elif args.task == "arc_challenge":
-        q, choices = data["question"], data["choices"]
-        options_text = "\n".join([f"{label}. {opt}" for label, opt in zip(choices["label"], choices["text"])])
-        new_example = f"Q: {q}\nOptions:\n{options_text}\nA: {pred}" + endoftext
-    elif args.task == "cqa":
+    if args.task == "cqa":
         text = data["question"]
         q = text['stem']
         choices = text['choices']
         options_text = "\n".join([f'({choice["label"]}) {choice["text"]}' for choice in choices])
         new_example = f"Q: {q}\nOptions:\n{options_text}\nA: {pred}" + endoftext
-    elif args.task == "aqua_rat":
-        q, options = data["question"], data["options"]
-        options_text = "\n".join([f"{opt}" for opt in  options])
-        new_example = f"Q: {q}\nOptions:\n{options_text}\nA: {pred}" + endoftext    
-    elif args.task == "asdiv":
-        t1, t2, f, a = data["body"], data["question"], data["formula"], data["answer"]
-        q = f"{t1} {t2}"
-        new_example = f"Q: {q}\nA: {pred}" + endoftext
-    elif args.task == "gsm8k":
-        q = data["question"]
-        new_example = f"Q: {q}\nA: {pred}" + endoftext
-    elif args.task == "svamp":
-        q = data["question_concat"]
-        new_example = f"Q: {q}\nA: {pred}" + endoftext
-    elif args.task == "anli_r1":
-        t1 = data["premise"]
-        choices = data['choices']
-        labels = choices["label"]  # [0, 1, 2]
-        texts = choices["text"]    # ["entailment", "neutral", "contradiction"]
-        options_text = "\n".join([f'({label}) {text}' for label, text in zip(labels, texts)])
-
-        t2 = data["hypothesis"]
-        q = f"{t1} {t2}"
-        new_example = f"Q: {q}\nOptions:\n{options_text}\nA: {pred}" + endoftext
-    elif args.task in ["numglue", "cladder"]:
-        q = data["question"]
-        new_example = f"Q: {q}\nA: {pred}" + endoftext
-    else:
-        raise NotImplementedError
 
     new_example_no_answer = q
     with open(args.idx_save + f"/{args.split}_corr_idx_{args.exp_iter}.txt", 'a+') as new_idx_f:
