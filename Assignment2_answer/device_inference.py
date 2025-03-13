@@ -67,64 +67,18 @@ def test_metric_STaR(args, predictions, datas, target_save, tokenizer, hint):
                 # Get predicted answer based on task type
                 pred_answer = None
                 try:
-                    if args.task == "logiqa":
-                        matches = list(re.finditer(r"\s*(\d+)", pred))
-                        pred_answer = int(matches[-1].group(1)) if matches else None
-
-                    elif args.task == "arc_challenge":
-                        matches = list(re.finditer(r"\b(A|B|C|D)\b", pred))
-                        pred_answer = matches[-1].group(1) if matches else None
-                    
-                    elif args.task == "anli_r1":
-                        matches = list(re.finditer(r"\b(0|1|2)\b", pred))
-                        pred_answer = matches[-1].group(1) if matches else None
-
-                    elif args.task == "cladder":
-                        matches = re.findall(r"\b(yes|no)\b", pred, re.IGNORECASE)
-                        pred_answer = matches[-1].lower() if matches else None
-
-                    elif args.task == "cqa":
+                    if args.task == "cqa":
                         matches = list(re.finditer(r"\b(A|B|C|D|E)\b", pred))
                         pred_answer = matches[-1].group(1) if matches else None
                     
-                    elif args.task == "aqua_rat":
-                        matches = list(re.finditer(r"\b(A|B|C|D|E)\b", pred))
-                        pred_answer = matches[-1].group(1) if matches else None
-                    
-                    elif args.task in ["asdiv", "svamp", "numglue"]:
-                        matches = re.findall(r"-?\d+\.?\d*", pred)
-                        pred_answer = matches[-1] if matches else None
-                        ref_match = re.search(r"-?\d+\.?\d*", str(answer))
-                        ref_answer = ref_match.group(0) if ref_match else None
-                        if pred_answer == ref_answer:
-                            cur_correct = True
-                    
-                    else:  # Default case for numeric answers
-                        matches = re.findall(r"-?\d+\.?\d*", pred)
-                        pred_answer = matches[-1] if matches else None
-                        ref_match = re.search(r"####\s*([-+]?\d*\.?\d+)", str(answer))
-                        ref_answer = ref_match.group(1).strip() if ref_match else None
-
-                        if pred_answer == ref_answer:
-                            cur_correct = True
-
                 except IndexError as e:
                     print(f"Warning: Failed to extract answer from prediction at index {idx}: {e}")
                     continue
 
                 # Verify answers match
-                if args.task == "logiqa" and isinstance(pred_answer, int) and pred_answer == answer:
+                if args.task == "cqa" and pred_answer and pred_answer == answer:
                     cur_correct = True
-                elif args.task == "arc_challenge" and pred_answer and pred_answer == answer:
-                    cur_correct = True
-                elif args.task == "cqa" and pred_answer and pred_answer == answer:
-                    cur_correct = True
-                elif args.task == "aqua_rat" and pred_answer and pred_answer == answer:
-                    cur_correct = True
-                elif args.task == "anli_r1" and pred_answer and str(pred_answer) == str(answer):
-                    cur_correct = True
-                elif args.task == "cladder" and pred_answer and pred_answer == answer.lower():
-                    cur_correct = True
+                
 
                 # Log prediction details
                 try:
@@ -137,26 +91,6 @@ def test_metric_STaR(args, predictions, datas, target_save, tokenizer, hint):
                         "true_answer": answer,
                         "correct": cur_correct
                     }
-
-                    if args.task == "logiqa":
-                        log_entry.update({
-                            "text": data.get("text", ""),
-                            "options": data.get("options", [])
-                        })
-                    elif args.task == "arc_challenge":
-                        log_entry.update({
-                            "choices": data.get("choices", {})
-                        })
-                    elif args.task == "asdiv":
-                        log_entry.update({
-                            "body": data.get("body", ""),
-                            "formula": data.get("formula", "")
-                        })
-                    elif args.task == "svamp":
-                        log_entry.update({
-                            "body": data.get("Body", ""),
-                            "equation": data.get("Equation", "")
-                        })
 
                     with open(log_file, 'a') as f:
                         json.dump(log_entry, f)
@@ -306,22 +240,7 @@ def broadcast_list(data, src_rank):
     return object_list[0]
 
 def prompt_preprocess(args, examples, tokenizer, prompt, hint):
-    if args.task == "logiqa":
-        if hint:
-            combined_texts = [f"{prompt}\n{t}\nQ: {q} ({a})\nOptions:\n0.{o[0]}\n1.{o[1]}\n2.{o[2]}\n3.{o[3]}\nA: " for t, q, o, a in zip(examples["text"], examples["question"], examples["options"], examples["answer"])]
-        else:
-            combined_texts = [f"{prompt}\n{t}\nQ: {q}\nOptions:\n0.{o[0]}\n1.{o[1]}\n2.{o[2]}\n3.{o[3]}\nA: " for t, q, o in zip(examples["text"], examples["question"], examples["options"])]
-
-    elif args.task == "arc_challenge": #arc_challenge
-        combined_texts = []
-        for q, choices, a in zip(examples["question"], examples["choices"], examples["answerKey"]):
-            options_text = "\n".join([f"({label}). {opt}" for label, opt in zip(choices["label"], choices["text"])])
-            if hint:
-                combined_texts.append(f"{prompt}\nQ: {q} ({a})\nOptions:\n{options_text}\nA: ")
-            else:
-                combined_texts.append(f"{prompt}\nQ: {q}\nOptions:\n{options_text}\nA: ")
-
-    elif args.task == "cqa":
+    if args.task == "cqa":
         combined_texts = []
         for text, ans in zip(examples["question"], examples["answerKey"]):
             q = text['stem']
@@ -332,56 +251,6 @@ def prompt_preprocess(args, examples, tokenizer, prompt, hint):
             else:
                 combined_texts.append(f"{prompt}\nQ: {q}\nOptions:\n{options_text}\nA: ")
                 
-    elif args.task == "aqua_rat": 
-        combined_texts = []
-        for q, options, a in zip(examples["question"], examples["options"], examples["correct"]):
-            options_text = "\n".join([f"{opt}" for opt in  options])
-            if hint:
-                combined_texts.append(f"{prompt}\nQ: {q} ({a})\nOptions:\n{options_text}\nA: ")
-            else:
-                combined_texts.append(f"{prompt}\nQ: {q}\nOptions:\n{options_text}\nA: ")
-
-    elif args.task == "anli_r1":
-        combined_texts = []
-        for q, h, a, choices in zip(examples["premise"], examples["hypothesis"], examples["label"],examples["choices"]):
-            labels = choices["label"]  # [0, 1, 2]
-            texts = choices["text"]    # ["entailment", "neutral", "contradiction"]
-            options_text = "\n".join([f'({label}) {text}' for label, text in zip(labels, texts)])
-            if hint:
-                combined_texts.append(f"{prompt}\nQ: {q} {h} ({a})\nOptions:\n{options_text}\nA: ")
-            else:
-                combined_texts.append(f"{prompt}\nQ: {q} {h}\nOptions:\n{options_text}\nA: ")
-
-    elif args.task == "asdiv":
-        if hint:
-            answers = []
-            for a in examples["answer"]:
-                ans_match = re.search(r"-?\d+\.?\d*", str(a))
-                ans = ans_match.group(0) if ans_match else None
-                answers.append(ans)
-            combined_texts = [f"{prompt}\nQ: {t} {q} ({a})\nA: " for t, q, a in zip(examples["body"], examples["question"], answers)]
-        else:
-            combined_texts = [f"{prompt}\nQ: {t} {q}\nA: " for t, q in zip(examples["body"], examples["question"])]
-    
-    elif args.task == "gsm8k": # gsm8k
-        if hint:
-            answers = [a.split()[-1] for a in examples["answer"]]
-            combined_texts = [f"{prompt}\nQ: {q} ({a})\nA: " for q, a in zip(examples["question"], answers)]
-        else:
-            combined_texts = [f"{prompt}\nQ: {q}\nA: " for q in examples["question"]]
-
-    elif args.task == "svamp":
-        if hint:
-            combined_texts = [f"{prompt}\nQ: {q} ({a})\nA: " for q, a in zip(examples["question_concat"], examples["answer"])]
-        else:
-            combined_texts = [f"{prompt}\nQ: {q}\nA: " for q in examples["question_concat"]]
-
-    elif args.task in ["numglue", "cladder"]:
-        if hint:
-            combined_texts = [f"{prompt}\nQ: {q} ({a})\nA: " for q, a in zip(examples["question"], examples["answer"])]
-        else:
-            combined_texts = [f"{prompt}\nQ: {q}\nA: " for q in examples["question"]]
-
     else:
         raise NotImplementedError
     # Tokenize the combined texts
@@ -397,437 +266,8 @@ def prompt_preprocess(args, examples, tokenizer, prompt, hint):
     
     return tokenized
 
-
-def get_majority_vote(predictions_list, datas, args):
-    correct, total = 0, 0
-    detailed_logs = []
-
-    try:
-        for idx, (sample_predictions, data) in enumerate(zip(zip(*predictions_list), datas)):
-            sample_log = {
-                "index": idx,
-                "question": data.get("question", ""),
-                "reference_answer": data.get("answer", ""),
-                "predictions": [],
-                "voting_results": {},
-                "final_answer": None,
-                "correct": False
-            }
-
-            try:
-                ref = data.get("answer")
-                if ref is None:
-                    print(f"Warning: Missing reference answer for index {idx}")
-                    continue
-
-                vote_dict = {}
-                cleaned_predictions = []
-
-                for pred_idx, pred in enumerate(sample_predictions):
-                    try:
-                        q_start_idx = pred.find("Q: ")
-                        if q_start_idx != -1:
-                            pred = pred[:q_start_idx]
-
-                        pred_answer = None
-                        pred_log = {
-                            "sample_idx": pred_idx,
-                            "raw_prediction": pred,
-                            "extracted_answer": None,
-                            "valid": False
-                        }
-
-                        if args.task == "logiqa":
-                            matches = list(re.finditer(r"\s*(\d+)", pred))
-                            pred_answer = int(matches[-1].group(1)) if matches else None
-
-                        elif args.task == "arc_challenge":
-                            matches = list(re.findall(r"\b(A|B|C|D)\b", pred))
-                            pred_answer = matches[-1] if matches else None
-
-                        elif args.task == "anli_r1":
-                            matches = list(re.findall(r"\b(0|1|2)\b", pred))
-                            pred_answer = matches[-1] if matches else None
-
-                        elif args.task == "cladder":
-                            matches = re.findall(r"\b(yes|no)\b", pred, re.IGNORECASE)
-                            pred_answer = matches[-1].lower() if matches else None
-
-                        elif args.task == "cqa":
-                            matches = list(re.findall(r"\b(A|B|C|D|E)\b", pred))
-                            pred_answer = matches[-1] if matches else None
-                        elif args.task == "aqua_rat":
-                            matches = list(re.findall(r"\b(A|B|C|D|E)\b", pred))
-                            pred_answer = matches[-1] if matches else None
-
-                        else: ## GSM8K, ASDIV, SVAMP
-                            matches = re.findall(r"-?\d+\.?\d*", pred)
-                            pred_answer = matches[-1] if matches else None
-
-                        pred_log["extracted_answer"] = pred_answer
-                        if pred_answer is not None:
-                            pred_log["valid"] = True
-                            vote_dict[str(pred_answer)] = vote_dict.get(str(pred_answer), 0) + 1
-                            cleaned_predictions.append(pred_answer)
-
-                        sample_log["predictions"].append(pred_log)
-
-                    except Exception as e:
-                        print(f"Warning: Error processing prediction {pred_idx} in sample {idx}: {e}")
-                        continue
-
-                sample_log["voting_results"] = vote_dict
-
-                if vote_dict:
-                    try:
-                        # Find all answers with maximum votes
-                        max_votes = max(vote_dict.values())
-                        top_answers = [ans for ans, votes in vote_dict.items() if votes == max_votes]
-
-                        # If there's a tie, use confidence or other heuristics
-                        if len(top_answers) > 1:
-                            # For now, just take the first one, but you could implement more sophisticated tie-breaking
-                            final_answer = top_answers[0]
-                            sample_log["tie_occurred"] = True
-                            sample_log["tied_answers"] = top_answers
-                        else:
-                            final_answer = top_answers[0]
-
-                        sample_log["final_answer"] = final_answer
-
-                        # Verify the answer
-                        is_correct = False
-                        if args.task == "logiqa":
-                            is_correct = int(final_answer) == ref
-                        elif args.task == "arc_challenge":
-                            is_correct = final_answer == ref
-                        elif args.task == "cqa":
-                            is_correct = final_answer == ref
-                        elif args.task == "aqua_rat":
-                            is_correct = final_answer == ref
-                        elif args.task == "anli_r1":
-                            is_correct = final_answer == str(ref)
-                        elif args.task == "cladder":
-                            is_correct = final_answer.lower() == str(ref).lower()
-                        elif args.task in ["asdiv", "svamp", "numglue"]:
-                            ref_match = re.search(r"-?\d+\.?\d*", str(ref))
-                            ref_answer = ref_match.group(0) if ref_match else None
-                            is_correct = final_answer.strip() == str(ref_answer).strip()
-                        else:
-                            ref_match = re.search(r"####\s*([-+]?\d*\.?\d+)", str(ref))
-                            ref_answer = ref_match.group(1).strip() if ref_match else None
-                            is_correct = final_answer.strip() == str(ref_answer).strip()
-
-                        if is_correct:
-                            correct += 1
-                            sample_log["correct"] = True
-
-                    except Exception as e:
-                        print(f"Warning: Error comparing answers in sample {idx}: {e}")
-                        continue
-
-                total += 1
-                detailed_logs.append(sample_log)
-
-            except Exception as e:
-                print(f"Warning: Error processing sample {idx}: {e}")
-                continue
-
-    except Exception as e:
-        print(f"Critical error in majority vote: {e}")
-
-    # Write detailed logs
-    try:
-        log_file = f"{args.log_dir}/self_consistency_detailed_log.jsonl"
-        with open(log_file, 'a') as f:
-            for log in detailed_logs:
-                json.dump(log, f)
-                f.write('\n')
-    except Exception as e:
-        print(f"Warning: Failed to write detailed logs: {e}")
-
-    # Calculate and log statistics
-    try:
-        stats = {
-            "total_samples": total,
-            "correct_samples": correct,
-            "accuracy": correct / total if total > 0 else 0,
-            "total_predictions": sum(len(log["predictions"]) for log in detailed_logs),
-            "valid_predictions": sum(
-                sum(1 for p in log["predictions"] if p["valid"])
-                for log in detailed_logs
-            ),
-            "ties": sum(1 for log in detailed_logs if log.get("tie_occurred", False)),
-        }
-
-        stats["valid_prediction_rate"] = (
-            stats["valid_predictions"] / stats["total_predictions"]
-            if stats["total_predictions"] > 0 else 0
-        )
-
-        with open(f"{args.log_dir}/self_consistency_stats.json", 'w') as f:
-            json.dump(stats, f, indent=2)
-
-    except Exception as e:
-        print(f"Warning: Failed to calculate and log statistics: {e}")
-
-    return correct, total
-
-def eval_dev(args, model, rank, test_loader, tokenizer, gen_length, n_shot_prompts):
-    generate_fn = model.module.generate if hasattr(model, 'module') else model.generate
-
-    eval_progress_bar = tqdm(
-        enumerate(test_loader),
-        total=len(test_loader),
-        desc=f"Eval [Rank {rank}]",
-        position=rank + 1,
-        leave=False,
-        disable=(rank != 0),
-    )
-
-    correctsum, totalsum = 0, 0
-    sc_correctsum, sc_totalsum = 0, 0
-    
-    with torch.no_grad():
-        for batch_idx, data in eval_progress_bar:
-            try:
-                if "input_ids" not in data or "attention_mask" not in data:
-                    print(f"Warning: Missing required tensors in batch {batch_idx}")
-                    continue
-
-                try:
-                    input_ids = data["input_ids"].to(rank)
-                    attention_mask = data["attention_mask"].to(rank)
-                except Exception as e:
-                    print(f"Warning: Error moving tensors to device in batch {batch_idx}: {e}")
-                    continue
-
-                try:
-                    outputs = generate_fn(
-                        input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        max_length=input_ids.size(1) + gen_length,
-                        pad_token_id=tokenizer.eos_token_id
-                    )
-                    generated_tokens = outputs[:, input_ids.size(1):]
-                    eos_token_id = tokenizer.eos_token_id
-                    actual_lengths = 0
-                    actual_c=0
-                    for seq in generated_tokens:
-                        eos_positions = (seq == eos_token_id).nonzero(as_tuple=True)[0]
-                        if eos_positions.numel() > 0:
-                            actual_length = eos_positions[0].item() + 1
-                        else:
-                            actual_length = seq.size(0)
-                        actual_lengths+=actual_length
-                        actual_c+=1
-
-                    actual_gen_len = actual_lengths
-                    
-                    flops_log_file = f"{args.flops_dir}/flops_log_{rank}.json"
-                    log_args(flops_log_file, iter=args.exp_iter,idx=batch_idx, split="dev", hint='False' , batch=actual_c, input= actual_c*input_ids.size(1),output= actual_gen_len)
-          
-                except Exception as e:
-                    print(f"Warning: Generation failed for batch {batch_idx}: {e}")
-                    continue
-
-                try:
-                    generated_tokens = outputs[:, input_ids.shape[-1]:]
-                    predictions = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-                except Exception as e:
-                    print(f"Warning: Decoding failed for batch {batch_idx}: {e}")
-                    continue
-
-                all_predictions = [None for _ in range(dist.get_world_size())]
-                all_data = [None for _ in range(dist.get_world_size())]
-
-                try:
-                    dist.all_gather_object(all_predictions, predictions)
-                    dist.all_gather_object(all_data, data)
-                except Exception as e:
-                    print(f"Warning: All-gather failed for batch {batch_idx}: {e}")
-                    continue
-
-                # Self-consistency 평가 등 기존 코드 처리...
-                if args.self_consistency > 0:
-                    try:
-                        sc_predictions_list = []
-                        for sc_idx in range(args.self_consistency):
-                            try:
-                                outputs = generate_fn(
-                                    input_ids=input_ids,
-                                    attention_mask=attention_mask,
-                                    max_length=input_ids.size(1) + gen_length,
-                                    pad_token_id=tokenizer.eos_token_id,
-                                    do_sample=True,
-                                    temperature=0.7,
-                                    top_k=40
-                                )
-                                generated_tokens = outputs[:, input_ids.shape[-1]:]
-                                sc_predictions = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-                                sc_predictions_list.append(sc_predictions)
-                            except Exception as e:
-                                print(
-                                    f"Warning: Self-consistency generation {sc_idx} failed for batch {batch_idx}: {e}")
-                                continue
-
-                        sc_all_predictions_list = [None for _ in range(dist.get_world_size())]
-                        try:
-                            dist.all_gather_object(sc_all_predictions_list, sc_predictions_list)
-                        except Exception as e:
-                            print(f"Warning: Self-consistency all-gather failed for batch {batch_idx}: {e}")
-                            continue
-                    except Exception as e:
-                        print(f"Warning: Self-consistency evaluation failed for batch {batch_idx}: {e}")
-                        continue
-
-                if rank == 0:
-                    try:
-                        all_predictions = list(chain.from_iterable(all_predictions))
-                        merged_data = []
-                        for rank_data in all_data:
-                            try:
-                                for i in range(len(rank_data["question"])):
-                                    single_data = {}
-                                    for key in rank_data.keys():
-                                        single_data[key] = rank_data[key][i]
-                                    merged_data.append(single_data)
-                            except Exception as e:
-                                print(f"Warning: Error merging data from rank {rank}: {e}")
-                                continue
-
-                        wrong_examples, correct, total = test_metric_STaR(args, all_predictions, merged_data,
-                                                                          args.target_save, tokenizer, rank)
-                        correctsum += correct
-                        totalsum += total
-
-                        if args.self_consistency > 0 and sc_predictions_list:
-                            try:
-                                sc_all_predictions_list = list(chain.from_iterable(sc_all_predictions_list))
-                                sc_correct, sc_total = get_majority_vote(sc_all_predictions_list, merged_data, args)
-                                sc_correctsum += sc_correct
-                                sc_totalsum += sc_total
-                            except Exception as e:
-                                print(f"Warning: Error processing self-consistency results: {e}")
-                    except Exception as e:
-                        print(f"Warning: Error processing results on rank 0: {e}")
-                        continue
-
-                dist.barrier()
-
-            except Exception as e:
-                print(f"Warning: Failed to process batch {batch_idx}: {e}")
-                continue
-             
-    if rank == 0:
-        try:
-            if totalsum > 0:
-                accuracy = correctsum / totalsum
-                print(f"Evaluation Accuracy: {accuracy * 100:.2f}%")
-            else:
-                print("Warning: No valid examples were processed in base evaluation")
-
-            if args.self_consistency > 0:
-                if sc_totalsum > 0:
-                    sc_accuracy = sc_correctsum / sc_totalsum
-                    print(
-                        f"Self-consistency ({args.self_consistency} samples) Evaluation Accuracy: {sc_accuracy * 100:.2f}%")
-                else:
-                    print("Warning: No valid examples were processed in self-consistency evaluation")
-                    sc_accuracy = None
-
-            try:
-                log_args(f"{args.log_dir}/eval_log.json",
-                         iter=args.exp_iter,
-                         split=args.split,
-                         accuracy=accuracy if totalsum > 0 else None,
-                         sc_accuracy=sc_accuracy if args.self_consistency > 0 and sc_totalsum > 0 else None)
-            except Exception as e:
-                print(f"Warning: Failed to log evaluation results: {e}")
-
-        except Exception as e:
-            print(f"Critical error in final evaluation reporting: {e}")
-
-    return correctsum, totalsum
-
-
-def clean_existing_eval_logs(args, rank):
-    """
-    Check for existing evaluation logs for the current iteration and clean only the train evaluation
-    entries for the current iteration.
-
-    Args:
-        args: The argument object containing log directories and iteration info
-        rank: The current process rank
-    """
-    if rank != 0:  # Only the main process should handle log cleanup
-        return
-
-    # Clean eval_log.json - only remove train entries for current iteration
-    try:
-        if os.path.exists(f"{args.log_dir}/eval_log.json"):
-            with open(f"{args.log_dir}/eval_log.json", 'r') as f:
-                eval_logs = json.load(f)
-
-            # Remove only train entries for current iteration
-            if isinstance(eval_logs, list):
-                eval_logs = [log for log in eval_logs
-                             if not (log.get('iter') == args.exp_iter and
-                                     log.get('split') == 'train')]
-            elif isinstance(eval_logs, dict):
-                # If using nested dictionary structure
-                if str(args.exp_iter) in eval_logs:
-                    if 'train' in eval_logs[str(args.exp_iter)]:
-                        del eval_logs[str(args.exp_iter)]['train']
-
-            with open(f"{args.log_dir}/eval_log.json", 'w') as f:
-                json.dump(eval_logs, f, indent=2)
-    except Exception as e:
-        print(f"Warning: Error cleaning eval_log.json: {e}")
-
-    # Only clean logs if we're in train mode
-    if args.split == "train":
-        # Clean JSONL files for current iteration's train entries
-        for file_path in [f"{args.log_dir}/prediction_log.jsonl",
-                          f"{args.log_dir}/self_consistency_detailed_log.jsonl"]:
-            if os.path.exists(file_path):
-                try:
-                    temp_file = file_path + '.temp'
-                    with open(file_path, 'r') as infile, open(temp_file, 'w') as outfile:
-                        for line in infile:
-                            try:
-                                entry = json.loads(line)
-                                # Keep entries that are not from current iteration's train split
-                                if not (entry.get('iter', entry.get('iteration')) == args.exp_iter and
-                                        entry.get('split', 'train') == 'train'):
-                                    outfile.write(line)
-                            except json.JSONDecodeError:
-                                continue
-
-                    os.replace(temp_file, file_path)
-                except Exception as e:
-                    print(f"Warning: Error cleaning {file_path}: {e}")
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-
-        # Clean generated data files for current iteration
-        try:
-            corr_idx_file = f"{args.idx_save}/{args.split}_corr_idx_{args.exp_iter}.txt"
-            if os.path.exists(corr_idx_file):
-                os.remove(corr_idx_file)
-
-            if os.path.exists(f"{args.target_save}/correct_data.txt"):
-                os.remove(f"{args.target_save}/correct_data.txt")
-        except Exception as e:
-            print(f"Warning: Error cleaning generated data files: {e}")
-
 def evaluate(args, model, rank, world_size, test_loader, tokenizer, gen_length, target_save, n_shot_prompts, n_shot_prompts_hint):
     # Clean existing logs before starting evaluation
-    dist.barrier()  # Ensure all processes are synchronized
-    if args.split == "train":  # Only clean logs when in train mode
-        clean_existing_eval_logs(args, rank)
-    dist.barrier()  # Wait for cleanup to complete
-
     model.eval()
 
     if args.split == "train": # Wrong example generation only for training (Not evaluation)
@@ -841,9 +281,6 @@ def evaluate(args, model, rank, world_size, test_loader, tokenizer, gen_length, 
         else:
             wrong_wrong_datasets, correctsum_hint, totalsum_hint = eval_examples(args, model, rank, wrong_test_loader, tokenizer, gen_length, n_shot_prompts_hint, hint=True)
 
-    else:
-        correctsum, totalsum = eval_dev(args, model, rank, test_loader, tokenizer, gen_length, n_shot_prompts)
-        correctsum_hint, totalsum_hint = "_", "_"
     dist.barrier()
 
     if rank == 0:
@@ -932,13 +369,6 @@ def fsdp_main(rank, world_size, args):
         if rank == 0:
             log_args(f"{args.log_dir}/elapsed_time_log.json", iter=args.exp_iter, log_point="gen_train_data", time=init_start_event.elapsed_time(init_end_event) / 1000)
 
-    elif args.split == "dev":
-        init_start_event.record()
-        correct, total, correct_hint, total_hint = evaluate(args, model, rank, world_size, test_loader, tokenizer, args.gen_length, args.target_save, n_shot_prompts, n_shot_prompts_hint)
-        init_end_event.record()
-        if rank == 0:
-            log_args(f"{args.log_dir}/elapsed_time_log.json", iter=args.exp_iter, log_point="test", time=init_start_event.elapsed_time(init_end_event) / 1000)
-
     if rank == 0:
         accuracy = correct / total
         if args.split == "train":
@@ -980,7 +410,7 @@ if __name__ == "__main__":
     # STaR specific
     args.name = params["name"]
     args.idx_save = params["target_save"] 
-    args.target_save = params["target_save"] if split != "dev" else f'{args.task}/new_dev.txt'
+    args.target_save = params["target_save"] 
     args.model_dir = params["model_dir"]
     try: # load from trained model
         args.total_steps = params["total_steps"]

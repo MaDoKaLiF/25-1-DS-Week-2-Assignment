@@ -62,106 +62,6 @@ def gen_train():
             os.system(train_cmd)
 
 
-# def gen_records():
-#     gen_cmd = f'python3 create_finetune_tfrecords.py {record_folder(cur_iter - 1)} {record_folder(cur_iter - 1)}  --model_name={args.model_name} --seed={args.seed}'
-#     gen_cmd += f' --max-length={args.max_length}'
-#     gen_cmd += f' --idx_save={record_folder(cur_iter - 1)}'
-#     gen_cmd += f' --split=train'
-#     gen_cmd += f' --exp_iter={cur_iter}'
-
-#     print(f"Creating records for finetuning {cur_iter}: {gen_cmd}")
-#     if not args.dry_run and (cur_iter >= args.start_iter):
-#         if args.method in {"vanilla"}:
-#             os.system(gen_cmd)
-
-#     train_set = f"{experiment_name}/{exp_iteration}.index"
-
-#     if args.method in {"vanilla"}:
-#         with open(f"data/{train_set}", "w") as new_data_file:
-#             new_data_file.write(f"{record_folder(cur_iter - 1)}.pt")
-#     return
- 
-def get_n_steps():
-    if args.steady_grow:
-        return int(args.start_steps + args.add_steps * (cur_iter - 1))
-    elif args.exponential_grow:  # Default setup from STaR paper
-        return int(args.start_steps * (args.grow_steps ** (cur_iter - 1)))
-    else:
-        # Count data points
-        total_count = 0
-        for cur_file in sorted(os.listdir(record_folder(cur_iter - 1)),
-                               key=lambda x: int(x.split('.')[0].split("_")[-1])):
-            with open(f"{record_folder(cur_iter - 1)}/{cur_file}", encoding='utf-8') as train_file:
-                train_file_text = train_file.read()
-                total_count += len(train_file_text.split("\n\n"))
-                print(len(train_file_text.split("\n\n")))
-        train_epochs = args.base_epochs + args.add_epochs * (cur_iter - 1)
-        cur_steps = int(
-            total_count * train_epochs // (args.batch_size * args.grad_accumulation * torch.cuda.device_count()))
-        return cur_steps  # cur_steps
-
-
-def gen_config():
-    print(f"Creating new config file {cur_iter}")
-    config_name = f'configs/{experiment_name}/{exp_iteration}.json'
-    os.makedirs(record_folder(cur_iter), exist_ok=True)
-    with open(prev_config, encoding='utf-8') as base_json_file:
-        new_json = json.load(base_json_file)
-        new_json["model_dir"] = f"{args.base_model_location}/{exp_iteration}"
-        new_json["target_save"] = record_folder(cur_iter)
-        new_json["total_steps"] = get_n_steps()
-        new_json["name"] = exp_iteration
-        new_json["p_rationalization"] = args.p_rationalization
-        new_json["grad_accumulation"] = args.grad_accumulation
-    with open(config_name, "w", encoding='utf-8') as new_json_file:
-        json.dump(new_json, new_json_file, indent=2)
-    os.makedirs(new_json["model_dir"], exist_ok=True)
-    return config_name
-
-def gen_no_beta_config():
-    print(f"Creating new config file {cur_iter}")
-    config_name = f'configs/{experiment_name}/{exp_iteration}.json'
-    os.makedirs(record_folder(cur_iter), exist_ok=True)
-    with open(prev_config, encoding='utf-8') as base_json_file:
-        new_json = json.load(base_json_file)
-        new_json["model_dir"] = f"{args.base_model_location}/{exp_iteration}"
-        new_json["target_save"] = record_folder(cur_iter)
-        new_json["total_steps"] = get_no_beta_steps()
-        new_json["name"] = exp_iteration
-        new_json["p_rationalization"] = args.p_rationalization
-        new_json["grad_accumulation"] = args.grad_accumulation
-    with open(config_name, "w", encoding='utf-8') as new_json_file:
-        json.dump(new_json, new_json_file, indent=2)
-    os.makedirs(new_json["model_dir"], exist_ok=True)
-    return config_name
-
-
-# def train_model():
-#     if args.method in {"vanilla"}:
-#         model_cmd = f"python device_train.py --config {config_name} --tune-model-path={args.base_model_location} --exp_iter={cur_iter} --seed={args.seed} --log_dir={record_folder(cur_iter - 1)} --data_dir=data/{experiment_name}/{exp_iteration}.index"
-#         if len(log_gen) >1:  
-#             delete_path = f"{args.base_model_location}/{experiment_name}_{cur_iter - 2}/step_{log_gen[0]}/lm.pt"
-#             model_cmd += f" --delete_path={delete_path}"
-#         if args.accumulate == True and cur_iter != 1:
-#             model_path = f"{args.base_model_location}/{experiment_name}_{cur_iter - 1}/step_{log_gen[-1]}/lm.pt"
-#             model_cmd += f" --model_path={model_path}"
-    
-#     print(f"Train model {cur_iter}: {model_cmd}")
-#     if not args.dry_run and (cur_iter >= args.start_iter):
-#         os.system(model_cmd)
-
-
-# def eval_model():
-#     eval_cmd = f"python3 device_inference.py --config={config_name} --split=dev --seed={args.seed}"
-#     eval_cmd += f" --task={task} "
-#     eval_cmd += f" --log_dir={task}/{experiment_name} --exp_iter={cur_iter}"
-#     eval_cmd += f" --flops_dir={record_folder(cur_iter-1)}"
-
-#     print(f"Eval model {cur_iter}: {eval_cmd}")
-#     if not args.dry_run and (cur_iter >= args.start_iter) and not args.skip_eval:
-#         os.system(eval_cmd)
-
-
 def copy_files():
     all_files = sorted(os.listdir(record_folder(cur_iter - 1)), key=lambda x: int(x.split('.')[0].split("_")[-1]))
     relevant_files = all_files[-args.copy_n:]
@@ -223,34 +123,6 @@ if __name__ == "__main__":
 
     log_gen =[]
 
-    # 첫 iteration이 아닌 경우 처리
-    # if last_completed_iter > 0:
-    #     prev_config = f'configs/{experiment_name}/{experiment_name}_{last_completed_iter}.json'
-    #     if not os.path.exists(prev_config):
-    #         print(f"Warning: Could not find config file for last completed iteration: {prev_config}")
-    #         print("Falling back to base config")
-    #         prev_config = f"configs/{experiment_name}/base.json"
-    #     else:
-    #         print(f"Starting iteration {args.start_iter} using config from iteration {last_completed_iter}")
-
-    #     # flops 로그 파일 삭제
-    #     flops_log_files = glob.glob(record_folder(last_completed_iter) + f"/flops_log*.json")
-    #     for file in flops_log_files:
-    #         os.remove(file)
-    #     indice_log_files = glob.glob(record_folder(last_completed_iter) + f"/*indices_log.json")
-    #     for file in indice_log_files:
-    #         os.remove(file)
-    #     file_path=record_folder(last_completed_iter) + f"/final_indices_stats.json"
-    #     if os.path.exists(file_path):
-    #         os.remove(file_path)
-    #     file_path=record_folder(last_completed_iter) + f"/train_log.json"
-    #     if os.path.exists(file_path):
-    #         os.remove(file_path)
-    #         # 이전 iteration의 beta 구하기
-    #     for cur_iter in range(args.start_iter - 2,args.start_iter):
-    #         exp_iteration = f"{experiment_name}_{cur_iter}"
-    #         log_gen.append(get_n_steps())
-
     os.makedirs(f'data/{experiment_name}', exist_ok=True)
     os.makedirs(f'{task}/{experiment_name}', exist_ok=True)
 
@@ -258,28 +130,4 @@ if __name__ == "__main__":
     # 메인 학습 루프
     for cur_iter in range(1, args.n_iters + 1):
         exp_iteration = f"{experiment_name}_{cur_iter}"
-
-        # #restart_point가 'eval'이고 첫 iteration인 경우, train 과정 건너뛰기
-        # if restart_point == 'eval' and cur_iter == args.start_iter:
-        #     config_name = f'configs/{experiment_name}/{experiment_name}_{cur_iter}.json'
-        #     eval_model()
-        # else:
         gen_train()
-
-        # start_time = time.time()
-        # gen_records()
-        # elapsed_record = time.time() - start_time
-        # file = f"{task}/{experiment_name}/elapsed_time_log.json"
-        # log_args(file, iter=cur_iter, log_point="tfrecord", time=elapsed_record)
-
-        # config_name = gen_config()
-        # train_model()
-        # eval_model()
-
-        # prev_config = config_name
-        # log_gen.append(get_n_steps())
-        # if len(log_gen) > 2:
-        #     log_gen.pop(0)
-
-        # if args.copy_n > 0:
-        #     copy_files()
