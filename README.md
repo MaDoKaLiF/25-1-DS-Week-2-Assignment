@@ -1,8 +1,9 @@
 # 25-1-DS-Week-2-Assignment
 
 # Assignment1
-	WordPieceTokenizer 구현해보고 기존 BPE와 성능 비교해보기.
+	WordPieceTokenizer 구현해보고 기존 BPE와 성능 비교해보기
 	다른 과제처럼 #TODO 부분 구현해주신 다음 tokenizer_test.py를 실행하여 BPE와의성능비교해보기!.
+	우선 make_voca.py를 통해 voca.txt를 생성해 주자.
 	python tests/tokenizer_test.py 를 실행했을때, 아래 Example과 같이 나온다면 성공! 
 
 ## 디렉토리 구조
@@ -11,6 +12,7 @@ Assignment1/
 └── src/
 	├── __init__.py
 	├── utils.py
+	├── make_voca.py
 	├── vocab.txt
     └── WordPieceTokenizer.py
 └── tests/
@@ -26,6 +28,7 @@ Test the tokenizer against hugging's face implementation:
 
 ```bash
 pip install transformers
+python src/word_piece_tokenizer/make_voca.py
 python tests/tokenizer_test.py
 ```
 
