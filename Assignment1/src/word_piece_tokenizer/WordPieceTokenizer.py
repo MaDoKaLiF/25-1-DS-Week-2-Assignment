@@ -3,60 +3,59 @@ from pathlib import Path
 import os
 
 from .BasicTokenizer import BasicTokenizer
-from .Trie import Trie
-from .utils import load_vocab
+from .utils import load_vocab,whitespace_tokenize
 
-
-class WordPieceTokenizer:
-
-    def __init__(self):
-        self.unk_token = "[UNK]"
-        self.sep_token = "[SEP]"
-        self.cls_token = "[CLS]"
-
+class WordpieceTokenizer:
+    """Runs WordPiece tokenization."""
+    def __init__(self, max_input_chars_per_word=100):
         self.vocab = load_vocab(os.path.join(str(Path(__file__).resolve().parent), "vocab.txt"))
-        self._initialise_tokens_trie()
-
-        self.ids_to_tokens = OrderedDict([(ids, tok)
-                                          for tok, ids in self.vocab.items()])
-        self.basic_tokenizer = BasicTokenizer()
-
-    def _initialise_tokens_trie(self):
-        self.tokens_trie = Trie(self._convert_token_to_id(self.unk_token))
-        for tok, tok_id in self.vocab.items():
-            self.tokens_trie.add(tok, tok_id)
+        self.unk_token = "[UNK]"
+        self.max_input_chars_per_word = max_input_chars_per_word
 
     def tokenize(self, text):
-        cls_token_id = self._convert_token_to_id(self.cls_token)
-        sep_token_id = self._convert_token_to_id(self.sep_token)
-        tokenized_text = [cls_token_id, *self._tokenize(text), sep_token_id]
-        return tokenized_text
+        """
+        Tokenizes a piece of text into its word pieces. This uses a greedy longest-match-first algorithm to perform
+        tokenization using the given vocabulary.
 
-    def _tokenize(self, text):
-        split_tokens = []
-        for token in self.basic_tokenizer.tokenize(text):
-            split_tokens += self._wordpiece_tokenize(token)
-        return split_tokens
+        For example, `input = "unaffable"` wil return as output `["un", "##aff", "##able"]`.
 
-    def _wordpiece_tokenize(self, text):
-        token_ids = []
+        Args:
+            text: A single token or whitespace separated tokens. This should have
+                already been passed through *BasicTokenizer*.
 
-        while text != "##":
-            token_id, text = self.tokens_trie.getLongestMatchToken(text)
-            text = "##" + text
-            token_ids = [*token_ids, token_id]
+        Returns:
+            A list of wordpiece tokens.
+        """
 
-        return token_ids
+        output_tokens = []
+        for token in whitespace_tokenize(text):
+            chars = list(token)
+            if len(chars) > self.max_input_chars_per_word:
+                output_tokens.append(self.unk_token)
+                continue
 
-    def _convert_token_to_id(self, token):
-        return self.vocab.get(token, self.vocab.get(self.unk_token))
+            is_bad = False
+            start = 0
+            sub_tokens = []
+            while start < len(chars):
+                end = len(chars)
+                cur_substr = None
+                while start < end:
+                    substr = "".join(chars[start:end])
+                    if start > 0:
+                        substr = "##" + substr
+                    if substr in self.vocab:
+                        cur_substr = substr
+                        break
+                    end -= 1
+                if cur_substr is None:
+                    is_bad = True
+                    break
+                sub_tokens.append(cur_substr)
+                start = end
 
-    def _convert_id_to_token(self, index):
-        return self.ids_to_tokens.get(index, self.unk_token)
-
-    def convert_tokens_to_string(self, tokens):
-        out_string = " ".join(tokens).replace(" ##", "").strip()
-        return out_string
-    
-    def convert_ids_to_tokens(self, ids):
-        return [self._convert_id_to_token(tok_id) for tok_id in ids]
+            if is_bad:
+                output_tokens.append(self.unk_token)
+            else:
+                output_tokens.extend(sub_tokens)
+        return output_tokens

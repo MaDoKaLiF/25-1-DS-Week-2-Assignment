@@ -1,1 +1,1 @@
-from .WordPieceTokenizer import WordPieceTokenizer
+from .WordPieceTokenizer import WordpieceTokenizer
