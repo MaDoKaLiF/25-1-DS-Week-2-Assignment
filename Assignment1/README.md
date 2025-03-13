@@ -29,17 +29,27 @@ pip install word-piece-tokenizer
 ### Example
 
 ```python
-from word_piece_tokenizer import WordPieceTokenizer
-tokenizer = WordPieceTokenizer()
+The tree fell unexpectedly short.
+[464, 5509, 3214, 25884, 1790, 13]
+['[UNK]', 'tree', 'fell', 'unexpectedly', 'short', '##.']
 
-ids = tokenizer.tokenize('reading a storybook!')
-# [101, 3752, 1037, 2466, 8654, 999, 102]
+ Performance Results:
+BPE tokenizer: 6.458908319473267e-05
+This tokenizer: 9.03010368347168e-06
+This tokenizer is 86.02% faster
+[Average] This tokenizer is 81.31% faster
 
-tokens = tokenizer.convert_ids_to_tokens(ids)
-# ['[CLS]', 'reading', 'a', 'story', '##book', '!', '[SEP]']
+you are짱 짱짱bye bye
+[5832, 389, 168, 100, 109, 23821, 100, 109, 168, 100, 109, 16390, 33847]
+['you', '[UNK]', '[UNK]', 'bye']
 
-tokenizer.convert_tokens_to_string(tokens)
-# '[CLS] reading a storybook ! [SEP]'
+ Performance Results:
+BPE tokenizer: 0.00020454823970794678
+This tokenizer: 1.5280209481716156e-05
+This tokenizer is 92.53% faster
+[Average] This tokenizer is 81.52% faster
+
+
 ```
 
 ### Running Tests
@@ -81,8 +91,3 @@ The following features has been removed from the tokenizer:
 
 The tokenizer's _longest substring token matching_ algorithm is implemented using a `trie` instead of _greedy longest-match-first_
 
-### The Trie
-
-The original `Trie` class has been modified to adapt to the modified _longest substring token matching_ algorithm.
-
-Instead of a `split` function that seperates the input string into substrings, the new trie implements a `getLongestMatchToken` function that returns the _token value `(int)`_ of the longest substring match, and the _remaining unmatched substring `(str)`_
