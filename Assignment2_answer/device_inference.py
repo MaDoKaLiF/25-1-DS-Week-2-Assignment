@@ -12,7 +12,7 @@ from itertools import chain
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 import torch.multiprocessing as mp
 
-from utils import get_model_tokenizer, get_loaded_model_tokenizer, get_wrong_examples_dataloader_STaR, get_dataloader, setup, cleanup, log_args, log_truncation_warnings
+from utils import get_model_tokenizer, get_wrong_examples_dataloader_STaR, get_dataloader, setup, cleanup, log_args, log_truncation_warnings
 
 pp = pprint.PrettyPrinter(indent=2).pprint
 
@@ -120,12 +120,12 @@ def test_metric_STaR(args, predictions, datas, target_save, tokenizer, hint):
 
     return wrong_examples, correct, total
 
-def eval_examples(args, model, rank, test_loader, tokenizer, gen_length, n_shot_prompts, hint=False):
+def eval_examples(args, model, rank, train_loader, tokenizer, gen_length, n_shot_prompts, hint=False):
     generate_fn = model.module.generate if hasattr(model, 'module') else model.generate
 
     eval_progress_bar = tqdm(
-        enumerate(test_loader),
-        total=len(test_loader),
+        enumerate(train_loader),
+        total=len(train_loader),
         desc=f"{'Hint' if hint else 'No Hint'} Eval [Rank {rank}]",
         position=rank + 1,
         leave=False,
@@ -258,39 +258,24 @@ def prompt_preprocess(args, examples, tokenizer, prompt, hint):
     
     return tokenized
 
-def evaluate(args, model, rank, world_size, test_loader, tokenizer, gen_length, target_save, n_shot_prompts, n_shot_prompts_hint):
+def evaluate(args, model, rank, world_size, train_loader, tokenizer, gen_length, target_save, n_shot_prompts, n_shot_prompts_hint):
     # Clean existing logs before starting evaluation
     model.eval()
 
     if args.split == "train": # Wrong example generation only for training (Not evaluation)
-        wrong_datasets, correctsum, totalsum = eval_examples(args, model, rank, test_loader, tokenizer, gen_length, n_shot_prompts, hint=False)
+        wrong_datasets, correctsum, totalsum = eval_examples(args, model, rank, train_loader, tokenizer, gen_length, n_shot_prompts, hint=False)
         wrong_datasets = broadcast_list(wrong_datasets, src_rank=0)
-        wrong_test_loader, sampler_wrong_test = get_wrong_examples_dataloader_STaR(args, wrong_datasets, rank, world_size)
+        wrong_train_loader, sampler_wrong_train = get_wrong_examples_dataloader_STaR(args, wrong_datasets, rank, world_size)
         if args.no_hint:
-            wrong_datasets, correctsum2, totalsum2 = eval_examples(args, model, rank, wrong_test_loader, tokenizer, gen_length, n_shot_prompts, hint=False)
+            wrong_datasets, correctsum2, totalsum2 = eval_examples(args, model, rank, wrong_train_loader, tokenizer, gen_length, n_shot_prompts, hint=False)
             correctsum += correctsum2
             correctsum_hint, totalsum_hint = "_", "_"
         else:
-            wrong_wrong_datasets, correctsum_hint, totalsum_hint = eval_examples(args, model, rank, wrong_test_loader, tokenizer, gen_length, n_shot_prompts_hint, hint=True)
+            wrong_wrong_datasets, correctsum_hint, totalsum_hint = eval_examples(args, model, rank, wrong_train_loader, tokenizer, gen_length, n_shot_prompts_hint, hint=True)
 
     dist.barrier()
 
     return correctsum, totalsum, correctsum_hint, totalsum_hint
-
-def get_ckpt_path(args, ckpt_step=-1):
-    model_dir = args.model_dir
-    if ckpt_step == -1:
-        ckpt_step = args.total_steps    
-        
-    path = f"{model_dir}/step_{ckpt_step}/lm.pt"
-    if os.path.exists(path):
-        return path
-    else: # Use base model
-        if args.split == "train":
-            print(f"{path} not found, using base model")
-        else:
-            raise FileNotFoundError(f"{path} not found, running evaluation using base model. exiting")
-        return None
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -326,17 +311,7 @@ def fsdp_main(rank, world_size, args):
     n_shot_prompts = "\n".join(n_shot_prompts)
     n_shot_prompts_hint = "\n".join(n_shot_prompts_hint)
 
-    # Load ckpt
-    ckpt_path = get_ckpt_path(args, args.ckpt_step)
-    if ckpt_path != None: # load trained model
-        dist.barrier()
-        model, tokenizer = get_loaded_model_tokenizer(args, ckpt_path, args.model_name, rank, eval=True)
-        dist.barrier()
-        if rank == 0:
-            print(f"model loaded from {ckpt_path}")
-        
-    else: # Use base model (first iteration)
-        model, tokenizer = get_model_tokenizer(args, args.model_name, rank, eval=True)
+    model, tokenizer = get_model_tokenizer(args, args.model_name, rank, eval=True)
 
     tokenized_prompt = tokenizer(n_shot_prompts, return_tensors="pt")
     prompt_tokenized_len = tokenized_prompt["input_ids"].shape[1]
@@ -346,7 +321,7 @@ def fsdp_main(rank, world_size, args):
 
     args.batch_size = args.test_batch_size # for inference task on train set
 
-    train_loader, sampler_train, test_loader, sampler_test = get_dataloader(args, tokenizer, rank, world_size)
+    train_loader, sampler_train = get_dataloader(args, tokenizer, rank, world_size)
 
     init_start_event = torch.cuda.Event(enable_timing=True)
     init_end_event = torch.cuda.Event(enable_timing=True)
