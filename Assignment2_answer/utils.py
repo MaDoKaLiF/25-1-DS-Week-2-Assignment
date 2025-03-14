@@ -15,7 +15,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, get_scheduler
 import pickle
 import logging
 from safetensors.torch import load_file
-import glob
 
 
 def build_problem_id_mapping(args, dataset_name, tokenizer=None):
@@ -34,333 +33,27 @@ def build_problem_id_mapping(args, dataset_name, tokenizer=None):
 
     try:
         # Handle different dataset sources and structures
-        if dataset_name == "gsm8k":
-            dataset = load_from_disk("../datasets/data_gsm8k")
-            train_data = dataset["train"]
-            test_data = dataset["test"]
+        train_data = load_dataset("json", data_files="../datasets/CommonsenseQA/train_rand_split.jsonl")["train"]
+        test_data = load_dataset("json", data_files="../datasets/CommonsenseQA/test.jsonl")["train"]
 
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
+        # Process train set
+        for idx, example in enumerate(train_data):
+            question_id = str(example.get("idx", idx))
+            problem_mapping[question_id] = {
+                "question": example.get("question", ""),
+                "answer": example.get("answer", ""),
+                "split": "train"
+            }
 
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "gsmsymb":
-            # Load GSM8k for train data
-            dataset_gsm8k = load_from_disk("../datasets/data_gsm8k_escape")
-            train_data = dataset_gsm8k["train"]
-            test_data = dataset_gsm8k["test"]
-
-            # Process train set from GSM8k
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set from GSM8k
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"  # Note: in your code, GSM8k test is used as train for gsmsymb
-                }
-
-            # Load symbolic test data
-            symb_test = load_dataset("json", data_files="../datasets/gsm_symbolic/generated_data/GSM_symbolic.jsonl",
-                                     split="train")
-
-            # Process symbolic test data
-            for idx, example in enumerate(symb_test):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "logiqa":
-            train_data = load_dataset("json", data_files="../datasets/data_logiqa2_split/train.jsonl")["train"]
-            test_data = load_dataset("json", data_files="../datasets/data_logiqa2_split/test.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "cladder":
-            train_data = load_dataset("json", data_files="../datasets/data_cladder_split/cladder_train_long.jsonl")[
-                "train"]
-            test_data = load_dataset("json", data_files="../datasets/data_cladder_split/cladder_test.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name.startswith("toy_"):
-            # Handle toy datasets (add, sub, counting)
-            if dataset_name == "toy_add_arithmetic":
-                train_file = "../datasets/toy/add_train.jsonl"
-                test_file = "../datasets/toy/add_test.jsonl"
-            elif dataset_name == "toy_sub_arithmetic":
-                train_file = "../datasets/toy/sub_train.jsonl"
-                test_file = "../datasets/toy/sub_test.jsonl"
-            elif dataset_name == "toy_counting":
-                train_file = "../datasets/toy/letter_count_train.jsonl"
-                test_file = "../datasets/toy/letter_count_test.jsonl"
-
-            # Load and process data
-            train_data = load_dataset("json", data_files=train_file)["train"]
-            test_data = load_dataset("json", data_files=test_file)["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "arc_challenge":
-            train_data = load_dataset("json", data_files="../datasets/data_arc_challenge/train_val_combined.jsonl")[
-                "train"]
-            test_data = load_dataset("json", data_files="../datasets/data_arc_challenge/test_new.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "cqa":
-            train_data = load_dataset("json", data_files="../datasets/CommonsenseQA/train_rand_split.jsonl")["train"]
-            test_data = load_dataset("json", data_files="../datasets/CommonsenseQA/test.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "aqua_rat":
-            train_data = load_dataset("json", data_files="../datasets/data_aqua_rat/train_new.jsonl")["train"]
-            test_data = load_dataset("json", data_files="../datasets/data_aqua_rat/test_new.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "anli_r1":
-            train_data = load_dataset("json", data_files="../datasets/data_anli/train_r1_modified.jsonl")["train"]
-            test_data = load_dataset("json", data_files="../datasets/data_anli/test_r1_modified.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "asdiv":
-            train_data = load_dataset("json", data_files="../datasets/data_asdiv/train_data.jsonl")["train"]
-            test_data = load_dataset("json", data_files="../datasets/data_asdiv/test_data.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "svamp":
-            train_data = load_dataset("json", data_files="../datasets/data_svamp/train.jsonl")["train"]
-            test_data = load_dataset("json", data_files="../datasets/data_svamp/test.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "numglue":
-            train_data = load_dataset("json", data_files="../datasets/data_numglue/type_4/converted_train.jsonl")[
-                "train"]
-            test_data = load_dataset("json", data_files="../datasets/data_numglue/type_4/converted_test.jsonl")["train"]
-
-            # Process train set
-            for idx, example in enumerate(train_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "train"
-                }
-
-            # Process test set
-            for idx, example in enumerate(test_data):
-                question_id = str(example.get("idx", idx))
-                problem_mapping[question_id] = {
-                    "question": example.get("question", ""),
-                    "answer": example.get("answer", ""),
-                    "split": "test"
-                }
-
-        elif dataset_name == "STaR":
-            # For STaR datasets that use pickle file
-            if not hasattr(args, 'dataset_path'):
-                raise ValueError("dataset_path is required for STaR dataset")
-
-            with open(args.dataset_path, 'rb') as f:
-                dataset_train = pickle.load(f)
-
-            for item in dataset_train:
-                idx = str(item.get('idx'))
-                # For STaR, we use tokenizer to decode tokens if available
-                if 'tokens' in item and tokenizer:
-                    text = tokenizer.decode(item['tokens'], skip_special_tokens=True)
-                    # Try to extract question and answer from text format
-                    parts = text.split('Answer:')
-                    question = parts[0].strip() if len(parts) > 0 else text
-                    answer = parts[1].strip() if len(parts) > 1 else ""
-
-                    problem_mapping[idx] = {
-                        "question": question,
-                        "answer": answer,
-                        "original_text": text,
-                        "split": "train"  # Assuming STaR dataset is for training
-                    }
-                else:
-                    # If tokens not available or no tokenizer, store raw data
-                    problem_mapping[idx] = item
-
-        else:
-            # For other datasets, try generic approach
-            raise ValueError(f"Dataset '{dataset_name}' not recognized. Add specific handling for this dataset.")
-
+        # Process test set
+        for idx, example in enumerate(test_data):
+            question_id = str(example.get("idx", idx))
+            problem_mapping[question_id] = {
+                "question": example.get("question", ""),
+                "answer": example.get("answer", ""),
+                "split": "test"
+            }
+        
         print(f"Successfully built mapping for {len(problem_mapping)} problems from {dataset_name}")
         return problem_mapping
 
@@ -541,36 +234,6 @@ def update_problem_tracking(args, correct_problems, current_iter):
         print(f"Problem tracking data updated for {len(correct_problems)} problems at iteration {current_iter}")
     return tracking_data
 
-def merge_flops_logs(args):
-    if args.split=='dev':
-        flops_log_files = glob.glob(f"{args.flops_dir}/flops_log_*.json")
-    elif args.split=='train':
-        flops_log_files = glob.glob(f"{args.idx_save}/flops_log_*.json")
-    else:
-        flops_log_files = glob.glob(f"{args.log_dir}/flops_log_*.json")
-    merged_data = []
-
-    for file in flops_log_files:
-        with open(file, 'r') as f:
-            try:
-                data = json.load(f)
-                merged_data.extend(data)
-            except json.JSONDecodeError:
-                continue
-    if args.split=='dev':
-        with open(f"{args.flops_dir}/flops_log.json", 'w') as f:
-            json.dump(merged_data, f, indent=2)
-    elif args.split=='train':
-        with open(f"{args.idx_save}/flops_log.json", 'w') as f:
-            json.dump(merged_data, f, indent=2)
-    else:
-        with open(f"{args.log_dir}/flops_log.json", 'w') as f:
-            json.dump(merged_data, f, indent=2)
-
-    # # Optionally, remove the individual log files
-    # for file in flops_log_files:
-    #     os.remove(file)
-
 def fsdp_wrap(args, model, rank, cpu_offload=False):
     if args.precision == "bf16":
         mixed_precision_policy = MixedPrecision(
@@ -696,28 +359,18 @@ def get_model_tokenizer(args, model_name, rank, eval=False):
 
 
 def get_optimizer_scheduler_step_based(args, model, train_loader):
-    if args.task == "gsm8k":
-        # GSM8K task: No warmup
-        if args.optimizer == "AdamW":
-            optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-        elif args.optimizer == "Adam":
-            optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    # Other tasks: Keep original warmup logic
+    if args.optimizer == "AdamW":
+        optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == "Adam":
+        optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-        # Constant learning rate (no scheduling)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.0)
-    else:
-        # Other tasks: Keep original warmup logic
-        if args.optimizer == "AdamW":
-            optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-        elif args.optimizer == "Adam":
-            optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    def lr_lambda(current_step: int):
+        if current_step < args.warm_up_steps:
+            return float(current_step) / float(max(1, args.warm_up_steps))
+        return 1.0
 
-        def lr_lambda(current_step: int):
-            if current_step < args.warm_up_steps:
-                return float(current_step) / float(max(1, args.warm_up_steps))
-            return 1.0
-
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     return optimizer, scheduler
 
@@ -823,14 +476,6 @@ def load_jsonl(file_path):
         print(f"Error loading JSONL file: {e}")
     return data
 
-def remove_matching_questions(dataset, questions_to_remove):
-    # Filter out rows where the question matches any in questions_to_remove
-    filtered_dataset = dataset.filter(lambda example: example['question'] not in questions_to_remove)
-    file_path=f"../removed/data_gsm8k_escape_filtered_{args.exp_iter-2}.json"
-    filtered_dataset.to_json(file_path)
-
-    return filtered_dataset
-
 def get_wrong_examples_dataloader_STaR(args, wrong_examples, rank, world_size):
     dataset_test = Dataset.from_list(wrong_examples)
 
@@ -883,13 +528,12 @@ def add_idx_to_batch(batch, indices):
 def get_dataloader(args, tokenizer, rank, world_size):
     dataset, dataset_train, dataset_test = None, None, None
     
-    if args.task == "cqa":
-        dataset_train = load_dataset("json", data_files="../CommonsenseQA/train_rand_split.jsonl")["train"]
-        dataset_test = load_dataset("json", data_files="../CommonsenseQA/test.jsonl")["train"]
+    dataset_train = load_dataset("json", data_files="CommonsenseQA/train_rand_split.jsonl")["train"]
+    dataset_test = load_dataset("json", data_files="CommonsenseQA/test.jsonl")["train"]
 
-        # Preprocess datasets
-        dataset_train = dataset_train.map(lambda examples: preprocess_function(args, examples, tokenizer, "train"), batched=True)
-        dataset_test = dataset_test.map(lambda examples: preprocess_function(args, examples, tokenizer, "test"), batched=True)
+    # Preprocess datasets
+    dataset_train = dataset_train.map(lambda examples: preprocess_function(args, examples, tokenizer, "train"), batched=True)
+    dataset_test = dataset_test.map(lambda examples: preprocess_function(args, examples, tokenizer, "test"), batched=True)
 
     dataset_train = dataset_train.map(
     add_idx_to_batch,
@@ -923,48 +567,27 @@ def get_dataloader(args, tokenizer, rank, world_size):
     return train_loader, sampler_train, test_loader, sampler_test
 
 def preprocess_function(args, examples, tokenizer, split):
-    if args.task == "cqa":
-        combined_texts = []
-        # question_components = examples["question"]
+    combined_texts = []
+    # question_components = examples["question"]
 
-        for text, ans in zip(examples["question"], examples["answerKey"]):
-            q = text['stem']
-            choices = text['choices']
-            options_text = "\n".join([f'({choice["label"]}) {choice["text"]}' for choice in choices])
-            if split == "train":
-                combined_texts.append(f"Q: {q}\nOptions:\n{options_text}\nA: {ans}")
-            else:
-                combined_texts.append(f"Q: {q}\nOptions:\n{options_text}\nA: ")
-
-        tokenized = tokenizer(
-            combined_texts,
-            padding="max_length",
-            truncation=True,
-            max_length=args.max_length
-        )
-
-        tokenized["question"] = examples["question"]
-        tokenized["answer"] = examples["answerKey"]
-
-    # gsm8k, cladder
-    else:
-        # Tokenize the input text and keep "question" and "answer"
+    for text, ans in zip(examples["question"], examples["answerKey"]):
+        q = text['stem']
+        choices = text['choices']
+        options_text = "\n".join([f'({choice["label"]}) {choice["text"]}' for choice in choices])
         if split == "train":
-            combined_texts = [f"Q: {q}\nA: {a}" for q, a in zip(examples["question"], examples["answer"])]
+            combined_texts.append(f"Q: {q}\nOptions:\n{options_text}\nA: {ans}")
         else:
-            combined_texts = [f"Q: {q}\nA: " for q in examples["question"]]
+            combined_texts.append(f"Q: {q}\nOptions:\n{options_text}\nA: ")
 
-        # Tokenize the combined texts
-        tokenized = tokenizer(
-            combined_texts,
-            padding="max_length",  # Pad to max length
-            truncation=True,  # Truncate if exceeding max length
-            max_length=args.max_length,  # Adjust max length as needed
-        )
+    tokenized = tokenizer(
+        combined_texts,
+        padding="max_length",
+        truncation=True,
+        max_length=args.max_length
+    )
 
-        # Add the original question and answer to the tokenized data
-        tokenized["question"] = examples["question"]
-        tokenized["answer"] = examples["answer"]
+    tokenized["question"] = examples["question"]
+    tokenized["answer"] = examples["answerKey"]
 
     log_truncation_warnings(args, combined_texts, tokenizer, log_point="Simple data load")
 

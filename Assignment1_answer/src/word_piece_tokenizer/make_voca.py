@@ -1,11 +1,7 @@
 import math
 from collections import defaultdict, Counter
 from pathlib import Path
-
-
-def whitespace_tokenize(text):
-    """간단한 공백 기준 토큰화 함수."""
-    return text.strip().split()
+from utils import whitespace_tokenize
 
 def get_corpus(file_path):
     """파일에서 모든 텍스트 라인을 읽어 리스트로 반환합니다."""

@@ -12,18 +12,17 @@ from itertools import chain
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 import torch.multiprocessing as mp
 
-from utils import get_model_tokenizer, get_loaded_model_tokenizer, get_wrong_examples_dataloader_STaR, get_dataloader, setup, cleanup, log_args, log_truncation_warnings,merge_flops_logs
+from utils import get_model_tokenizer, get_loaded_model_tokenizer, get_wrong_examples_dataloader_STaR, get_dataloader, setup, cleanup, log_args, log_truncation_warnings
 
 pp = pprint.PrettyPrinter(indent=2).pprint
 
 
 def write_new_data(args, target_save, pred, data, endoftext):
-    if args.task == "cqa":
-        text = data["question"]
-        q = text['stem']
-        choices = text['choices']
-        options_text = "\n".join([f'({choice["label"]}) {choice["text"]}' for choice in choices])
-        new_example = f"Q: {q}\nOptions:\n{options_text}\nA: {pred}" + endoftext
+    text = data["question"]
+    q = text['stem']
+    choices = text['choices']
+    options_text = "\n".join([f'({choice["label"]}) {choice["text"]}' for choice in choices])
+    new_example = f"Q: {q}\nOptions:\n{options_text}\nA: {pred}" + endoftext
 
     new_example_no_answer = q
     with open(args.idx_save + f"/{args.split}_corr_idx_{args.exp_iter}.txt", 'a+') as new_idx_f:
@@ -67,16 +66,15 @@ def test_metric_STaR(args, predictions, datas, target_save, tokenizer, hint):
                 # Get predicted answer based on task type
                 pred_answer = None
                 try:
-                    if args.task == "cqa":
-                        matches = list(re.finditer(r"\b(A|B|C|D|E)\b", pred))
-                        pred_answer = matches[-1].group(1) if matches else None
+                    matches = list(re.finditer(r"\b(A|B|C|D|E)\b", pred))
+                    pred_answer = matches[-1].group(1) if matches else None
                     
                 except IndexError as e:
                     print(f"Warning: Failed to extract answer from prediction at index {idx}: {e}")
                     continue
 
                 # Verify answers match
-                if args.task == "cqa" and pred_answer and pred_answer == answer:
+                if  pred_answer and pred_answer == answer:
                     cur_correct = True
                 
 
@@ -177,9 +175,6 @@ def eval_examples(args, model, rank, test_loader, tokenizer, gen_length, n_shot_
 
                     actual_gen_len = actual_lengths
                     
-                    flops_log_file = f"{args.idx_save}/flops_log_{rank}.json"
-                    log_args(flops_log_file, iter=args.exp_iter,idx=batch_idx, split="inf", hint=hint , batch=actual_c, input= actual_c*input_ids.size(1),output= actual_gen_len)
-          
                 except Exception as e:
                     print(f"Warning: Decoding failed for batch {batch_idx}: {e}")
                     continue
@@ -240,19 +235,16 @@ def broadcast_list(data, src_rank):
     return object_list[0]
 
 def prompt_preprocess(args, examples, tokenizer, prompt, hint):
-    if args.task == "cqa":
-        combined_texts = []
-        for text, ans in zip(examples["question"], examples["answerKey"]):
-            q = text['stem']
-            choices = text['choices']
-            options_text = "\n".join([f'({choice["label"]}) {choice["text"]}' for choice in choices])
-            if hint:
-                combined_texts.append(f"{prompt}\nQ: {q} ({ans})\nOptions:\n{options_text}\nA: ")
-            else:
-                combined_texts.append(f"{prompt}\nQ: {q}\nOptions:\n{options_text}\nA: ")
+    combined_texts = []
+    for text, ans in zip(examples["question"], examples["answerKey"]):
+        q = text['stem']
+        choices = text['choices']
+        options_text = "\n".join([f'({choice["label"]}) {choice["text"]}' for choice in choices])
+        if hint:
+            combined_texts.append(f"{prompt}\nQ: {q} ({ans})\nOptions:\n{options_text}\nA: ")
+        else:
+            combined_texts.append(f"{prompt}\nQ: {q}\nOptions:\n{options_text}\nA: ")
                 
-    else:
-        raise NotImplementedError
     # Tokenize the combined texts
     tokenized = tokenizer(
         combined_texts,
@@ -283,8 +275,6 @@ def evaluate(args, model, rank, world_size, test_loader, tokenizer, gen_length, 
 
     dist.barrier()
 
-    if rank == 0:
-        merge_flops_logs(args)
     return correctsum, totalsum, correctsum_hint, totalsum_hint
 
 def get_ckpt_path(args, ckpt_step=-1):
@@ -314,7 +304,6 @@ def parse_args():
     parser.add_argument("--exp_iter", type=int, default=-1, help="exp iteration for logging")
     parser.add_argument("--seed", type=int, default=10, help="Random seed for shuffling data (default: 10)")
     parser.add_argument("--log_dir", type=str, default="", help="logging dir")
-    parser.add_argument("--flops_dir", type=str, default="", help="logging dir")
 
 
     return parser.parse_args()

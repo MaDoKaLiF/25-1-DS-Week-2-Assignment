@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "word-piece-tokenizer"
 version = "1.0.1"
-description = "A Lightweight Word Piece Tokenizer"
+description = "build Word Piece Tokenizer"
 readme = "README.md"
 requires-python = ">=3.9"
 keywords = ["word", "piece", "tokenizer", "transformer", "bert", "uncased", "nlp", "natural", "language", "processing"]
-authors = [{ name = "Jing Hua", email = "mail@dev.tjh.sg"}]
+authors = [{ name = "Hyeongjin Kim"}]
 classifiers = [
     "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
     "Programming Language :: Python",
@@ -22,4 +22,4 @@ dependencies = []
 test = ["transformers"]
 
 [project.urls]
-Repository = "https://github.com/ztjhz/word-piece-tokenizer"
+Repository = "https://github.com/MaDoKaLiF/25-1-DS-Week-2-Assignment.git"

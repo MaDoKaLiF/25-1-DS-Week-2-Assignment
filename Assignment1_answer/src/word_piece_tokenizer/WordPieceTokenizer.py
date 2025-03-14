@@ -10,6 +10,8 @@ class WordpieceTokenizer:
     def __init__(self, max_input_chars_per_word=100):
         self.vocab = load_vocab(os.path.join(str(Path(__file__).resolve().parent), "vocab.txt"))
         self.unk_token = "[UNK]"
+        self.sep_token = "[SEP]"
+        self.cls_token = "[CLS]"
         self.max_input_chars_per_word = max_input_chars_per_word
 
     def tokenize(self, text):
@@ -32,6 +34,7 @@ class WordpieceTokenizer:
             chars = list(token)
             if len(chars) > self.max_input_chars_per_word:
                 output_tokens.append(self.unk_token)
+                
                 continue
 
             is_bad = False
@@ -58,4 +61,5 @@ class WordpieceTokenizer:
                 output_tokens.append(self.unk_token)
             else:
                 output_tokens.extend(sub_tokens)
-        return output_tokens
+        return [self.cls_token] + output_tokens + [self.sep_token]
+
