@@ -9,12 +9,12 @@
 ## 디렉토리 구조
 ```bash
 Assignment1/
-└── src/
-	├── __init__.py
-	├── utils.py
-	├── make_voca.py
-	├── vocab.txt
-    └── WordPieceTokenizer.py
+├── src/
+│	├── __init__.py
+│	├── utils.py
+│	├── make_voca.py
+│	├── vocab.txt
+│   └── WordPieceTokenizer.py
 └── tests/
 	├── __init__.py
 	├── tests.txt
