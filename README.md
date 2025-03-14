@@ -81,3 +81,10 @@ Assignment2/
 ├── device_inference.py
 └── iteration_train.py
 ```
+## Example 
+
+```
+전체 블록 중 최대 토큰 개수 (max token length): 186
+전체 블록 중 최대 생성토큰 개수 (gen_length): 125
+전체 블록 중 최대 토큰 결과 (max_sentence): The answer must be a place which could be dirty during the big football game. Television (A) would not be something dirty, so it cannot be the answer. Attic (B) and corner (C) would be places which would be dusty, so these two cannot be the answer. Library (D) is also out because we have been told that they cannot clean the corner and library during football matches, so it cannot be the answer. Ground (E) is also out because we cannot clean the ground during the football match, so it cannot be the answer. This leaves the only option: television (A).
+```
