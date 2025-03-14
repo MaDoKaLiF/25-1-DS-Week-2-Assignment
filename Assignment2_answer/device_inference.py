@@ -11,7 +11,6 @@ import re
 from itertools import chain
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 import torch.multiprocessing as mp
-
 from utils import get_model_tokenizer, get_wrong_examples_dataloader_STaR, get_dataloader, setup, cleanup, log_args, log_truncation_warnings
 
 pp = pprint.PrettyPrinter(indent=2).pprint
@@ -25,16 +24,11 @@ def write_new_data(args, target_save, pred, data, endoftext):
     new_example = f"Q: {q}\nOptions:\n{options_text}\nA: {pred}" + endoftext
 
     new_example_no_answer = q
-    with open(args.idx_save + f"/{args.split}_corr_idx_{args.exp_iter}.txt", 'a+') as new_idx_f:
-        print(f"idx: {data['idx']}\nQ: {new_example_no_answer}", file=new_idx_f, end="\n\n")
-
     with open(target_save, 'a+') as new_train_f:
         print(new_example, file=new_train_f, end="\n\n")
 
     return new_example
     
-
-
 def test_metric_STaR(args, predictions, datas, target_save, tokenizer, hint):
     wrong_examples = []
     correct, total = 0, 0
@@ -364,16 +358,12 @@ if __name__ == "__main__":
     args.max_length = params["max_length"]
     args.gen_length = params["gen_length"]
     args.n_shot = params["n_shot"]
-    args.self_consistency = params["self_consistency"]
-    args.delete_model_after_loading = params["delete_model_after_loading"]
     args.accumulate = params["accumulate"]
-    args.lora = params.get("lora", None)
     args.inference_temp = params["inference_temp"]
     args.no_hint = params["no_hint"]
 
     # STaR specific
     args.name = params["name"]
-    args.idx_save = params["target_save"] 
     args.target_save = params["target_save"] 
     args.model_dir = params["model_dir"]
     try: # load from trained model

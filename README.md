@@ -61,7 +61,8 @@ This tokenizer is 92.53% faster
 # Assignment2
 
 max token length를 구하여 LLM 학습 최적화 하기.
-
+1. run.sh를 실행하여, correct_data.txt를 생성한다.
+2. calculate_token_length.ipynb를 실행하여 적절한 gen_length와 max token length를 구한다.
 ## 디렉토리 구조
 ```bash
 
@@ -70,6 +71,11 @@ Assignment2/
 │   └── test.json
 ├── configs/
 │   └── cqa.json
+├── cqa(generated)
+│	...
+│	└── correct_data.txt
+├── calculate_token_length.ipynb
+├── run.sh
 ├── main.py
 ├── utils.py
 ├── device_inference.py
