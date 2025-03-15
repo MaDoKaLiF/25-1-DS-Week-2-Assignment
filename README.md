@@ -78,6 +78,7 @@ max token length를 구하여 LLM 학습 최적화 하기.
 1. run.sh를 실행하여, correct_data.txt를 생성한다.
 2. calculate_token_length.ipynb를 실행하여 적절한 gen_length와 max token length를 구한다.
 3. 2번에서 구한 gen_length와 max token length값을 cqa.json 넣어준다.(초기값 수정)
+4. calculate_token_length.ipynb를 실행하여 나온 결과값을 캡처하여 깃에 올려주면, 성공. 
 
 ## cqa.json
 ```
