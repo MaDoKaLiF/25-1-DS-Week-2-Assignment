@@ -59,10 +59,56 @@ This tokenizer is 92.53% faster
 ```
 
 # Assignment2
-
 max token length를 구하여 LLM 학습 최적화 하기.
+
+## Task 
+![alt text](image.png)
+✔ 데이터셋 분포 분석
+데이터셋에 긴 문장이 많으면 시퀀스 길이를 늘리고, 짧은 문장이 대부분이라면 줄이는 것이 효율적입니다.
+예: 데이터셋의 95%가 1,024 토큰 이하라면, 시퀀스 길이를 1,024로 설정해 리소스를 최적화할 수 있습니다.
+
+✔ 시퀀스와 배치 크기의 균형
+긴 시퀀스는 모델 성능을 향상시킬 수 있지만, GPU 메모리 사용량이 늘어나 배치 크기를 줄여야 할 수 있습니다.
+따라서 데이터셋의 특성을 보고 시퀀스 길이를 적절히 조절하고 배치를 늘려야 효과적인 학습이 될 수 있습니다.
+
+[출처: https://devocean.sk.com/blog/techBoardDetail.do?ID=167242&boardType=techBlog]
+
+
+## ToDo
 1. run.sh를 실행하여, correct_data.txt를 생성한다.
 2. calculate_token_length.ipynb를 실행하여 적절한 gen_length와 max token length를 구한다.
+3. 2번에서 구한 gen_length와 max token length값을 cqa.json 넣어준다.(초기값 수정)
+
+## cqa.json
+```
+{
+    "epochs": 1,
+    "grad_accumulation": 1,
+    "gen_length": 159,
+    "batch_size": 2,
+    "test_batch_size": 32,
+    "lr": 1e-05,
+    "weight_decay": 0.01,
+    "warm_up_steps": 100,
+    "model_dir": "checkpoints/",
+    "log_divisor": 100,
+    "save_divisor": 5,
+    "exp_name": "testrun",
+    "optimizer": "Adam",
+    "scheduler": "linear",
+    "precision": "bf16",
+    "model_name": "meta-llama/Llama-3.2-3B",
+    "max_length": 256,
+    "n_shot": 7,
+    "self_consistency": 5,
+    "delete_model_after_loading": true,
+    "accumulate": false,
+    "task": "cqa",
+    "inference_temp": 1.0,
+    "no_hint": false
+}
+```
+
 ## 디렉토리 구조
 ```bash
 
