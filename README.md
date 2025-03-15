@@ -10,8 +10,8 @@
 ```bash
 Assignment1/
 ├── src/
-│	├── __init__.py
-│	├── utils.py
+│├── __init__.py
+│├── utils.py
 │	├── make_voca.py
 │	├── vocab.txt
 │   └── WordPieceTokenizer.py
