@@ -10,14 +10,14 @@
 ```bash
 Assignment1/
 ├── src/
-│├── __init__.py
-│├── utils.py
-│	├── make_voca.py
-│	├── vocab.txt
-│   └── WordPieceTokenizer.py
+│  ├── __init__.py
+│  ├── utils.py
+│  ├── make_voca.py
+│  ├── vocab.txt
+│  └── WordPieceTokenizer.py
 └── tests/
-	├── __init__.py
-	├── tests.txt
+    ├── __init__.py
+    ├── tests.txt
     └── tokenizer_test.py
 
 ```
